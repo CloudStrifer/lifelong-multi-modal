@@ -1,0 +1,105 @@
+MODEL:
+  DEVICE: "cuda"
+  # Double quoting preserves the string type expected by the legacy config.
+  DEVICE_ID: "'0'"
+  NAME: "MDReID_TMDA_CSCR"
+  PRETRAIN_PATH_T: "./pretrain_model/ViT-B-16.pt"
+  TRANSFORMER_TYPE: "ViT-B-16"
+  STRIDE_SIZE: [16, 16]
+  SIE_CAMERA: False
+  SIE_VIEW: False
+  DIRECT: 0
+  ADD_SHARE: True
+  PROMPT: False
+  ADAPTER: False
+  FROZEN: False
+  ID_LOSS_WEIGHT: 0.25
+  TRIPLET_LOSS_WEIGHT: 1.0
+
+INPUT:
+  # Initial position grid. It is dynamically interpolated to the native
+  # person [256,128] or vehicle [128,256] grid for every task.
+  SIZE_TRAIN: [256, 128]
+  SIZE_TEST: [256, 128]
+  PROB: 0.5
+  RE_PROB: 0.5
+  PADDING: 10
+
+DATASETS:
+  ROOT_DIR: "./dataset"
+
+DATALOADER:
+  SAMPLER: "softmax_triplet"
+  NUM_INSTANCE: 8
+  # Set to 0 for Windows debugging; use 8-14 on Ubuntu after validation.
+  NUM_WORKERS: 0
+
+SOLVER:
+  OPTIMIZER_NAME: "AdamW"
+  BASE_LR: 0.00035
+  WEIGHT_DECAY: 0.0001
+  MAX_EPOCHS: 50
+  IMS_PER_BATCH: 64
+  LOG_PERIOD: 20
+  SEED: 1555
+
+TEST:
+  IMS_PER_BATCH: 128
+  FEAT_NORM: "yes"
+
+LIFELONG:
+  ENABLED: True
+  TRACK: "A"
+  # Track C: grouped / interleaved / alternate
+  ORDER: "grouped"
+  ADAPTER_RANK: 64
+  ADAPTER_DROPOUT: 0.0
+  ADAPTER_INIT: "mean"
+  ROUTING: "auto"
+  EVAL_SCENARIOS: ["RNT", "R", "N", "T"]
+  # Every 5 epochs, monitor only the current dataset with the current bank.
+  # Set PERIODIC_EVAL_PERIOD to 0 to disable.
+  PERIODIC_EVAL_PERIOD: 5
+  PERIODIC_EVAL_SCENARIOS: ["RNT"]
+  PERIODIC_EVAL_ROUTING: "oracle"
+  WM_MANIFEST: ""
+  AMP: True
+  GRAD_CLIP: 5.0
+  CONSISTENCY_LOSS_WEIGHT: 0.1
+  ROUTER:
+    # Category-aware multi-modal Task-Key router. The detector/object category
+    # only restricts person-vs-vehicle candidates; it never exposes dataset ID.
+    METHOD: "task_key"
+    CATEGORY_AWARE: True
+    KEYS_PER_MODALITY: 4
+    KEY_TEMPERATURE: 0.07
+    KEY_WEIGHT: 1.0
+    # Compare robustly calibrated scores instead of raw cosine values whose
+    # task-wise baselines differed strongly (e.g. RGBNT201 vs Market-MM).
+    TASK_KEY_CALIBRATION: True
+    TASK_KEY_CALIBRATION_FLOOR: 0.01
+    # Initialize the four keys from diverse frozen features in a few
+    # deterministic current-task batches to reduce immediate key collapse.
+    TASK_KEY_FEATURE_INITIALIZATION: True
+    TASK_KEY_INITIALIZATION_BATCHES: 4
+    # Keep the diagnosed raw consistency/entropy score disabled in the main
+    # method. These weights are reserved for controlled ablations.
+    AUX_CONSISTENCY_WEIGHT: 0.0
+    AUX_CONFIDENCE_WEIGHT: 0.0
+    LOSS_WEIGHT: 1.0
+    POSITIVE_WEIGHT: 1.0
+    MARGIN_WEIGHT: 1.0
+    # Geometry losses were heavily violated in the diagnosed run. Moderate
+    # increases make them material without dominating current-task fitting.
+    SEPARATION_WEIGHT: 0.5
+    DIVERSITY_WEIGHT: 0.2
+    MARGIN: 0.2
+    SEPARATION_MARGIN: 0.2
+    DIVERSITY_MARGIN: 0.2
+    KEY_LR_MULTIPLIER: 5.0
+    # Legacy router weights, used only when METHOD is "legacy".
+    CONSISTENCY_WEIGHT: 1.0
+    CONFIDENCE_WEIGHT: 0.1
+
+# Keep calibrated Task-Key checkpoints separate from the diagnosed raw-score run.
+OUTPUT_DIR: "./outputs/lifelong_task_key_calibrated"
