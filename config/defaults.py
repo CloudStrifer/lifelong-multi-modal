@@ -177,6 +177,10 @@ _C.LIFELONG.TRACK = "A"
 _C.LIFELONG.ORDER = "grouped"
 _C.LIFELONG.ADAPTER_RANK = 64
 _C.LIFELONG.ADAPTER_DROPOUT = 0.0
+# True keeps the proposed task x modality Adapter Bank. False is an ablation
+# in which every task owns one Adapter shared by R/N/T. The default preserves
+# the original module layout and checkpoint compatibility.
+_C.LIFELONG.MODALITY_DECOUPLED = True
 # Options: mean, latest, zero. "mean" initializes a new same-modality adapter
 # from the uniform average of all historical task adapters.
 _C.LIFELONG.ADAPTER_INIT = "mean"

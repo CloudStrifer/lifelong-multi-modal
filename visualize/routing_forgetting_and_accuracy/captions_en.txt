@@ -1,0 +1,11 @@
+Routing accuracy across stages
+Fig. X | Routing accuracy across sequential training on Track C. The figure shows macro-averaged routing accuracy across all tasks observed at each training stage for RNT, R, N and T query settings. The grey dashed curve denotes chance-level routing accuracy (100/k for k candidate task adapters). Stage 1 contains a single candidate route and is therefore trivially 100%. Results are single-run point estimates. Source data are provided with the figure.
+
+Final-stage routing accuracy
+Fig. X | Dataset-specific routing accuracy at the final training stage on Track C. Rows denote the five evaluation datasets, and columns denote the RNT, R, N and T query settings. Cell values are percentages, and darker shading within each column indicates higher routing accuracy. Results are single-run point estimates. Source data are provided with the figure.
+
+mAP forgetting
+Fig. X | mAP forgetting under automatic routing on Track C. The figure shows average mAP forgetting after training stages 2-5 for RNT, R, N and T query settings. Forgetting is computed over previously learned tasks as each task's best earlier mAP minus its current mAP, with the newly learned task excluded. Positive values indicate forgetting, whereas negative values indicate backward transfer or performance recovery. Because evaluation uses automatic routing, the reported values include both representation-related and routing-induced effects. Results are single-run point estimates. Source data are provided with the figure.
+
+R1 forgetting
+Fig. X | R1 forgetting under automatic routing on Track C. The figure shows average R1 forgetting after training stages 2-5 for RNT, R, N and T query settings. Forgetting is computed over previously learned tasks as each task's best earlier R1 minus its current R1, with the newly learned task excluded. Positive values indicate forgetting, whereas negative values indicate backward transfer or performance recovery. Because evaluation uses automatic routing, the reported values include both representation-related and routing-induced effects. Results are single-run point estimates. Source data are provided with the figure.

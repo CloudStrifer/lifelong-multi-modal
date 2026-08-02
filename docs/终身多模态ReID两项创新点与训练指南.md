@@ -182,7 +182,13 @@ h'
 LIFELONG:
   ADAPTER_RANK: 64
   ADAPTER_DROPOUT: 0.0
+  MODALITY_DECOUPLED: True
 ```
+
+`MODALITY_DECOUPLED=True` 是原有 TMDA 主实验：每个任务分别建立 R、N、T
+三个 Adapter。仅在整体创新点消融 A1/A3 中设置为 `False`，此时每个任务只建立
+一个由 R/N/T 共用的 Adapter。默认值保持为 `True`，因此原有配置、实验行为和
+checkpoint 参数路径不变。
 
 ## 5.3 每个任务的 Adapter Bank
 
@@ -707,8 +713,7 @@ Log-Sum-Exp 是经典的 smooth maximum。Nesterov 系统讨论了显式 max 结
 =
 \lambda_p\mathcal L_{\mathrm{pos}}
 +\lambda_m\mathcal L_{\mathrm{margin}}
-+\lambda_s\mathcal L_{\mathrm{sep}}
-+\lambda_d\mathcal L_{\mathrm{div}}.
++\lambda_s\mathcal L_{\mathrm{sep}}.
 \]
 
 当前配置：
@@ -716,8 +721,7 @@ Log-Sum-Exp 是经典的 smooth maximum。Nesterov 系统讨论了显式 max 结
 \[
 \lambda_p=1.0,\quad
 \lambda_m=1.0,\quad
-\lambda_s=0.5,\quad
-\lambda_d=0.2.
+\lambda_s=0.5,\quad .
 \]
 
 ### 6.8.1 正样本紧致损失
@@ -800,7 +804,7 @@ j<t,\quad c_j=c_t,\quad\gamma_{\mathrm{sep}}=0.2.
 
 > 从参数几何上避免新旧任务同模态 Key 高度重合。
 
-### 6.8.4 任务内多 Key 多样性损失
+### 6.8.4 任务内多 Key 多样性损失(不需要了)
 
 \[
 \mathcal L_{\mathrm{div}}
@@ -824,12 +828,12 @@ j<t,\quad c_j=c_t,\quad\gamma_{\mathrm{sep}}=0.2.
 
 ### 6.8.5 为什么需要四项
 
-| 去掉的损失 | 可能退化 |
-|---|---|
-| \(\mathcal L_{pos}\) | Key 不覆盖当前域 |
-| \(\mathcal L_{margin}\) | 当前与历史任务得分不可判别 |
-| \(\mathcal L_{sep}\) | 新旧任务 Key 几何重合 |
-| \(\mathcal L_{div}\) | 多 Key 退化为重复单 Key |
+| 去掉的损失 | 可能退化                                   |
+|---|----------------------------------------|
+| \(\mathcal L_{pos}\) | Key 不覆盖当前域                             |
+| \(\mathcal L_{margin}\) | 当前与历史任务得分不可判别                          |
+| \(\mathcal L_{sep}\) | 新旧任务 Key 几何重合                          |
+| \(\mathcal L_{div}\) | 多 Key 退化为重复单 Key (该损失函数反而下降性能，所以将其删掉)  | 
 
 四项并不自动等于四个独立创新。它们是一个路由目标中的核心项和正则项，必须通过
 逐项消融证明必要性。
@@ -1496,6 +1500,56 @@ CUDA_VISIBLE_DEVICES=2 python train_lifelong.py \
   OUTPUT_DIR ./outputs/ablation_adapter_rank32
 ```
 
+## 12.7 两项创新点整体组合消融
+
+四组实验统一定义为：
+
+| 实验 | TMDA 模态解耦 | CC-MTKR | Adapter | 路由 |
+|---|---:|---:|---|---|
+| A1 | 否 | 否 | 每任务一个 R/N/T 共享 Adapter | legacy |
+| A2 | 是 | 否 | 每任务三个模态独立 Adapter | legacy |
+| A3 | 否 | 是 | 每任务一个 R/N/T 共享 Adapter | calibrated Task-Key |
+| A4 | 是 | 是 | 每任务三个模态独立 Adapter | calibrated Task-Key |
+
+A1：
+
+```bash
+CUDA_VISIBLE_DEVICES=2 python train_lifelong.py \
+  --config_file configs/lifelong/MDReID_TMDA_CSCR.yml \
+  --track C --order grouped \
+  DATASETS.ROOT_DIR ./dataset \
+  MODEL.PRETRAIN_PATH_T /workspace/GuangjinOuyang/lifelong-multi-modal/data/reid/pretrain_model/ViT-B-16.pt \
+  DATALOADER.NUM_WORKERS 8 \
+  LIFELONG.MODALITY_DECOUPLED False \
+  LIFELONG.ROUTER.METHOD legacy \
+  LIFELONG.ROUTER.CATEGORY_AWARE False \
+  LIFELONG.ROUTER.LOSS_WEIGHT 0.0 \
+  LIFELONG.PERIODIC_EVAL_PERIOD 0 \
+  OUTPUT_DIR ./outputs/ablation_A1_shared_legacy
+```
+
+A3：
+
+```bash
+CUDA_VISIBLE_DEVICES=2 python train_lifelong.py \
+  --config_file configs/lifelong/MDReID_TMDA_CSCR.yml \
+  --track C --order grouped \
+  DATASETS.ROOT_DIR ./dataset \
+  MODEL.PRETRAIN_PATH_T /workspace/GuangjinOuyang/lifelong-multi-modal/data/reid/pretrain_model/ViT-B-16.pt \
+  DATALOADER.NUM_WORKERS 8 \
+  LIFELONG.MODALITY_DECOUPLED False \
+  LIFELONG.ROUTER.METHOD task_key \
+  LIFELONG.ROUTER.CATEGORY_AWARE True \
+  LIFELONG.ROUTER.TASK_KEY_CALIBRATION True \
+  LIFELONG.ROUTER.TASK_KEY_FEATURE_INITIALIZATION True \
+  LIFELONG.ROUTER.LOSS_WEIGHT 1.0 \
+  LIFELONG.PERIODIC_EVAL_PERIOD 0 \
+  OUTPUT_DIR ./outputs/ablation_A3_shared_ccmtkr
+```
+
+测试 A1/A3 checkpoint 时必须继续传入
+`LIFELONG.MODALITY_DECOUPLED False`，使模型按共享 Adapter 布局恢复参数。
+
 # 13. Windows 快速调试
 
 Windows PowerShell 只用于代码通路检查，不作为正式论文结果：
@@ -1618,4 +1672,3 @@ median/IQR校准由本文首次提出
   [Task-Key分数校准与路由修复说明.md](Task-Key分数校准与路由修复说明.md)
 - 单高斯路由备选方案：
   [单高斯域指纹路由实现与运行说明.md](单高斯域指纹路由实现与运行说明.md)
-

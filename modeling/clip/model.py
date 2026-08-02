@@ -293,31 +293,58 @@ class ResidualAttentionBlock(nn.Module):
 
         self.apply(self._init_weights)
 
-    def add_lifelong_task(self, task_key, bottleneck_dim, dropout=0.0, init_from=None):
-        """Register three modality-private adapters for a new continual task.
+    def add_lifelong_task(
+        self,
+        task_key,
+        bottleneck_dim,
+        dropout=0.0,
+        init_from=None,
+        modality_decoupled=True,
+    ):
+        """Register the Adapter layout for a new continual task.
 
-        ``init_from`` is a list of older task keys. Their same-modality adapter
-        weights are uniformly averaged to initialize the new bank.
+        The default creates three modality-private Adapters and intentionally
+        retains the original state-dict layout. The ablation layout creates
+        one ``shared`` Adapter used by R/N/T. ``init_from`` uniformly averages
+        compatible historical Adapters; mixed layouts are handled defensively
+        so checkpoints fail only on genuine tensor incompatibilities.
         """
         if task_key in self.lifelong_adapters:
             return
+        adapter_names = (
+            ("R", "N", "T") if modality_decoupled else ("shared",)
+        )
         bank = nn.ModuleDict({
-            modality: LifelongBottleneckAdapter(
+            adapter_name: LifelongBottleneckAdapter(
                 self.ln_2.normalized_shape[0], bottleneck_dim, dropout
             )
-            for modality in ("R", "N", "T")
+            for adapter_name in adapter_names
         })
         source_keys = [
             key for key in (init_from or []) if key in self.lifelong_adapters
         ]
         if source_keys:
             with torch.no_grad():
-                for modality in ("R", "N", "T"):
+                for adapter_name in adapter_names:
+                    source_adapters = []
+                    for source_key in source_keys:
+                        source_bank = self.lifelong_adapters[source_key]
+                        if adapter_name in source_bank:
+                            source_adapters.append(source_bank[adapter_name])
+                        elif "shared" in source_bank:
+                            source_adapters.append(source_bank["shared"])
+                        elif adapter_name == "shared":
+                            source_adapters.extend(
+                                source_bank[modality]
+                                for modality in ("R", "N", "T")
+                                if modality in source_bank
+                            )
+                    if not source_adapters:
+                        continue
                     source_states = [
-                        self.lifelong_adapters[key][modality].state_dict()
-                        for key in source_keys
+                        adapter.state_dict() for adapter in source_adapters
                     ]
-                    target_state = bank[modality].state_dict()
+                    target_state = bank[adapter_name].state_dict()
                     for name in target_state:
                         stacked = torch.stack([
                             state[name].to(
@@ -351,7 +378,17 @@ class ResidualAttentionBlock(nn.Module):
             modality_key = str(modality).upper()
             if modality_key not in ("R", "N", "T"):
                 raise KeyError("Unknown modality for lifelong adapter: {}".format(modality))
-            x = x + self.lifelong_adapters[task_key][modality_key](normalized)
+            bank = self.lifelong_adapters[task_key]
+            adapter_key = (
+                modality_key if modality_key in bank else "shared"
+            )
+            if adapter_key not in bank:
+                raise RuntimeError(
+                    "Task '{}' has neither a '{}' nor shared Adapter.".format(
+                        task_key, modality_key
+                    )
+                )
+            x = x + bank[adapter_key](normalized)
         return x
 
     def forward_with_adapter(self, x: torch.Tensor):
@@ -585,13 +622,21 @@ class VisionTransformer(nn.Module):
         self.ln_post = LayerNorm(width)
         self.proj = nn.Parameter(scale * torch.randn(width, output_dim))
 
-    def add_lifelong_task(self, task_key, bottleneck_dim, dropout=0.0, init_from=None):
+    def add_lifelong_task(
+        self,
+        task_key,
+        bottleneck_dim,
+        dropout=0.0,
+        init_from=None,
+        modality_decoupled=True,
+    ):
         for block in self.transformer.resblocks:
             block.add_lifelong_task(
                 task_key=task_key,
                 bottleneck_dim=bottleneck_dim,
                 dropout=dropout,
                 init_from=init_from,
+                modality_decoupled=modality_decoupled,
             )
 
     def _dynamic_positional_embedding(self, grid_h, grid_w, dtype, device):

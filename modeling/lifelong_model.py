@@ -289,6 +289,9 @@ class LifelongMDReID(nn.Module):
         self.task_categories: Dict[str, str] = {}
         self.adapter_rank = int(cfg.LIFELONG.ADAPTER_RANK)
         self.adapter_dropout = float(cfg.LIFELONG.ADAPTER_DROPOUT)
+        self.modality_decoupled = bool(
+            cfg.LIFELONG.MODALITY_DECOUPLED
+        )
         self.adapter_init = str(cfg.LIFELONG.ADAPTER_INIT).lower()
         self.router_method = str(cfg.LIFELONG.ROUTER.METHOD).lower()
         if self.router_method == "gaussian":
@@ -381,6 +384,7 @@ class LifelongMDReID(nn.Module):
             bottleneck_dim=self.adapter_rank,
             dropout=self.adapter_dropout,
             init_from=source_tasks,
+            modality_decoupled=self.modality_decoupled,
         )
         self.task_heads[task_key] = TaskIdentityHeads(self.feature_dim, num_classes)
         if self.router_method == "task_key":
@@ -1074,6 +1078,7 @@ class LifelongMDReID(nn.Module):
         router_key_buffer_total = sum(router_key_buffer_counts.values())
         gaussian_buffer_total = sum(gaussian_buffer_counts.values())
         return {
+            "modality_decoupled": self.modality_decoupled,
             "total": total,
             "trainable_current": trainable,
             "frozen_shared_and_other": total - trainable,
