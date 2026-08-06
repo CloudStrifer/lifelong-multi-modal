@@ -41,7 +41,7 @@
 - median（中位数）；
 - IQR（四分位距）；
 - 使用 median/IQR 的稳健缩放；
-- 余弦相似度、间隔损失和多样性正则。
+- 余弦相似度和间隔损失。
 
 ### 2.2 本文应主张的组合创新
 
@@ -528,7 +528,6 @@ KEYS_PER_MODALITY: 1 / 2 / 4 / 6 / 8
 
 - \(K\) 太小：难以覆盖数据集内多相机、多场景和多成像风格；
 - \(K\) 太大：可能过拟合、Key 重复、路由区域过宽，并增加计算；
-- `DIVERSITY_LOSS` 用于抑制多个 Key 塌缩。
 
 正式论文建议消融：
 
@@ -721,7 +720,7 @@ Log-Sum-Exp 是经典的 smooth maximum。Nesterov 系统讨论了显式 max 结
 \[
 \lambda_p=1.0,\quad
 \lambda_m=1.0,\quad
-\lambda_s=0.5,\quad .
+\lambda_s=0.5.
 \]
 
 ### 6.8.1 正样本紧致损失
@@ -804,38 +803,15 @@ j<t,\quad c_j=c_t,\quad\gamma_{\mathrm{sep}}=0.2.
 
 > 从参数几何上避免新旧任务同模态 Key 高度重合。
 
-### 6.8.4 任务内多 Key 多样性损失(不需要了)
-
-\[
-\mathcal L_{\mathrm{div}}
-=
-\mathbb E_{k\neq l}
-\left[
-\cos(q_{t,m,k},q_{t,m,l})
--\gamma_{\mathrm{div}}
-\right]_+,
-\]
-
-其中：
-
-\[
-\gamma_{\mathrm{div}}=0.2.
-\]
-
-作用：
-
-> 防止同一任务、同一模态的 \(K\) 个 Key 全部塌缩到一个方向。
-
-### 6.8.5 为什么需要四项
+### 6.8.4 为什么需要三项
 
 | 去掉的损失 | 可能退化                                   |
 |---|----------------------------------------|
 | \(\mathcal L_{pos}\) | Key 不覆盖当前域                             |
 | \(\mathcal L_{margin}\) | 当前与历史任务得分不可判别                          |
 | \(\mathcal L_{sep}\) | 新旧任务 Key 几何重合                          |
-| \(\mathcal L_{div}\) | 多 Key 退化为重复单 Key (该损失函数反而下降性能，所以将其删掉)  | 
 
-四项并不自动等于四个独立创新。它们是一个路由目标中的核心项和正则项，必须通过
+三项并不自动等于三个独立创新。它们共同构成路由目标，必须通过
 逐项消融证明必要性。
 
 ## 6.9 median/IQR 稳健分数校准
@@ -923,7 +899,7 @@ IQR=Q_3-Q_1,
 阶段A：训练Task-Key
   使用未校准原始分数
   calibrated=False
-  四项路由损失更新当前Key
+  三项路由损失更新当前Key
 
 阶段B：训练结束后拟合校准
   model.eval()
@@ -1097,10 +1073,9 @@ S_{\mathrm{MSVR}}(x_{\mathrm{RGBNT100}})+\delta.
 7. \(K=1/2/4/8\)；
 8. 去掉 margin；
 9. 去掉 separation；
-10. 去掉 diversity；
-11. \(\tau=0.05/0.07/0.1\)；
-12. Auto 与 Oracle 的 mAP 差值；
-13. R、N、T、RNT 分模态路由准确率。
+10. \(\tau=0.05/0.07/0.1\)；
+11. Auto 与 Oracle 的 mAP 差值；
+12. R、N、T、RNT 分模态路由准确率。
 
 ---
 
@@ -1140,7 +1115,7 @@ S_{\mathrm{MSVR}}(x_{\mathrm{RGBNT100}})+\delta.
 3. 从当前任务确定性batch提取Adapter-free冻结特征
 4. 用均值方向 + 最远点策略初始化当前Task-Key
 5. 冻结全部历史参数，只训练当前任务参数
-6. 使用ID、Triplet、一致性和四项路由损失训练固定epoch
+6. 使用ID、Triplet、一致性和三项路由损失训练固定epoch
 7. 训练结束后无梯度遍历当前任务，拟合R/N/T median与IQR
 8. 保存checkpoint
 9. 清除当前训练记录

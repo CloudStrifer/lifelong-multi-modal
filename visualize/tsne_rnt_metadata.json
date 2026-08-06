@@ -1,0 +1,50 @@
+{
+  "arguments": {
+    "num_ids": 8,
+    "modalities": [
+      "R",
+      "N",
+      "T"
+    ],
+    "points_per_group": 8,
+    "feature_dim": 64,
+    "id_separation": 4.0,
+    "modality_gap": 1.5,
+    "cluster_std": 10.0,
+    "data_seed": 42,
+    "input_npz": null,
+    "tsne_seed": 42,
+    "perplexity": 25.0,
+    "early_exaggeration": 12.0,
+    "learning_rate": "auto",
+    "max_iter": 1200,
+    "pca_dim": 30,
+    "display_scale": 1.0,
+    "point_size": 55.0,
+    "alpha": 0.88,
+    "title": "",
+    "figure_width": 11.5,
+    "figure_height": 9.0,
+    "dpi": 300,
+    "output": "tsne_rnt",
+    "formats": [
+      "png",
+      "svg",
+      "pdf"
+    ],
+    "save_data": true
+  },
+  "run": {
+    "n_samples": 192,
+    "input_feature_dim": 64,
+    "pca_dim_used": 30,
+    "perplexity_requested": 25.0,
+    "perplexity_used": 25.0,
+    "scikit_learn_version": "1.6.1",
+    "source": "synthetic",
+    "display_scale": 1.0,
+    "identity_count": 8,
+    "modality_count": 3
+  },
+  "integrity_note": "display_scale changes only within-(ID, modality) scatter after t-SNE; raw coordinates are preserved in the CSV."
+}
